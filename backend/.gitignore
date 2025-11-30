@@ -1,0 +1,10 @@
+# Rust build artifacts
+/target/
+**/*.rs.bk
+*.pdb
+
+# Cargo lock for binaries (keep for libraries)
+# Cargo.lock is kept by default for applications
+
+# Debug files
+**/*.dSYM/
