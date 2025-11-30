@@ -26,7 +26,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <Container maxWidth="md">
+        <Container>
           <Box sx={{ my: 4, textAlign: 'center' }}>
             <Typography variant="h2" component="h1" gutterBottom>
               Enoki
