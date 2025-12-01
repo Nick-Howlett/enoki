@@ -12,7 +12,10 @@ pub async fn list_users(State(state): State<AppState>) -> Result<Json<Vec<User>>
     User::find_all(&state.db)
         .await
         .map(Json)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+        .map_err(|e| {
+            tracing::error!(error = %e, "failed to list users");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })
 }
 
 pub async fn get_user(
@@ -21,7 +24,10 @@ pub async fn get_user(
 ) -> Result<Json<User>, StatusCode> {
     User::find_by_id(&state.db, id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .map_err(|e| {
+            tracing::error!(error = %e, user_id = %id, "failed to get user by id");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
         .map(Json)
         .ok_or(StatusCode::NOT_FOUND)
 }
@@ -33,5 +39,8 @@ pub async fn create_user(
     User::create(&state.db, payload)
         .await
         .map(|user| (StatusCode::CREATED, Json(user)))
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+        .map_err(|e| {
+            tracing::error!(error = %e, "failed to create user");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })
 }

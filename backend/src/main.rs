@@ -1,15 +1,20 @@
+mod auth;
 mod db;
 mod handlers;
+mod middleware;
 mod models;
+mod mem_db;
 mod routes;
 mod telemetry;
 
+use redis::aio::ConnectionManager;
 use sqlx::PgPool;
 use std::net::SocketAddr;
 
 #[derive(Clone)]
 pub struct AppState {
-    db: PgPool,
+    pub db: PgPool,
+    pub redis: ConnectionManager,
 }
 
 #[tokio::main]
@@ -19,8 +24,13 @@ async fn main() -> anyhow::Result<()> {
     telemetry::init();
 
     let db_pool = db::setup().await?;
-    let state = AppState { db: db_pool };
+    let redis_conn = mem_db::setup().await?;
 
+    let state = AppState {
+        db: db_pool,
+        redis: redis_conn,
+    };
+    
     let cors = routes::configure_cors();
     let app = routes::create_router(state, cors);
 

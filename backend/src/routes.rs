@@ -1,16 +1,22 @@
 use axum::{
     extract::State,
-    routing::{get},
+    middleware,
+    routing::{get, post},
     Router,
     Json,
     http
 };
 use http::{header, Method};
 use serde::{Deserialize, Serialize};
-use tower_http::cors::CorsLayer;
+use tower_cookies::CookieManagerLayer;
+use tower_http::{
+    cors::CorsLayer,
+    trace::{TraceLayer, DefaultMakeSpan, DefaultOnResponse, DefaultOnFailure},
+};
+use tracing::Level;
 
-use crate::handlers;
-use crate::AppState;
+use crate::{auth, handlers};
+use crate::{AppState, middleware as app_middleware};
 
 #[derive(Serialize, Deserialize)]
 pub struct HealthResponse {
@@ -24,7 +30,10 @@ pub async fn health_check(State(state): State<AppState>) -> Json<HealthResponse>
         .await
     {
         Ok(_) => "connected",
-        Err(_) => "disconnected",
+        Err(e) => {
+            tracing::error!(error = %e, "database health check failed");
+            "disconnected"
+        }
     };
 
     Json(HealthResponse {
@@ -53,9 +62,23 @@ pub fn configure_cors() -> CorsLayer {
 }
 
 pub fn create_router(state: AppState, cors: CorsLayer) -> Router {
+    let trace_layer = TraceLayer::new_for_http()
+        .make_span_with(DefaultMakeSpan::new()
+            .level(Level::INFO)
+            .include_headers(false))
+        .on_response(DefaultOnResponse::new().level(Level::INFO))
+        .on_failure(DefaultOnFailure::new().level(Level::ERROR));
+
     Router::new()
         .route("/api/health", get(health_check))
+        .route("/api/auth/signup", post(auth::signup))
+        .route("/api/auth/login", post(auth::login))
+        .route("/api/auth/logout", post(auth::logout))
+        .route("/api/auth/me", get(auth::me))
         .route("/api/users", get(handlers::user::list_users))
+        .layer(middleware::from_fn_with_state(state.clone(), app_middleware::log_request))
+        .layer(CookieManagerLayer::new())
+        .layer(trace_layer)
         .layer(cors)
         .with_state(state)
 }
